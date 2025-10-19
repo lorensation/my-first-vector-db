@@ -9,8 +9,13 @@
     <body>
         <div class="container">
             <header>
-                <h1>🔢 OpenAI Embeddings Showcase</h1>
-                <p class="subtitle">Explore text embeddings and semantic similarity using OpenAI's text-embedding-ada-002 model</p>
+                <div class="header-content">
+                    <div>
+                        <h1>🔢 OpenAI Embeddings Showcase</h1>
+                        <p class="subtitle">Explore text embeddings and semantic similarity using OpenAI's text-embedding-ada-002 model</p>
+                    </div>
+                    <a href="chat.html" class="btn btn-chat">💬 Try Chatbot</a>
+                </div>
             </header>
 
             <!-- Single Embedding Section -->
@@ -46,6 +51,40 @@
                 </div>
 
                 <div id="singleError" class="error hidden"></div>
+            </section>
+
+            <!-- Batch Embedding Section -->
+            <section class="card">
+                <h2>📚 Batch Embeddings</h2>
+                <p class="description">Generate embeddings for multiple texts at once (one per line)</p>
+                
+                <div class="input-group">
+                    <textarea 
+                        id="batchText" 
+                        placeholder="Enter multiple texts, one per line. For example:
+Beyond Mars: speculating life on distant planets.
+Jazz under stars: a night in New Orleans' music scene.
+Mysteries of the deep: exploring uncharted ocean caves."
+                        rows="8"
+                    ></textarea>
+                    <div class="batch-actions">
+                        <button id="loadExample" class="btn btn-secondary">Load Example Texts</button>
+                        <button id="generateBatch" class="btn btn-primary">Generate Batch Embeddings</button>
+                    </div>
+                </div>
+
+                <div id="batchResult" class="result hidden">
+                    <div class="result-header">
+                        <h3>✅ Batch Embeddings Created</h3>
+                        <span class="badge" id="batchCount"></span>
+                    </div>
+                    <div class="result-content">
+                        <p class="batch-info">Click on any item to expand and view its embedding</p>
+                        <div id="batchList" class="batch-list"></div>
+                    </div>
+                </div>
+
+                <div id="batchError" class="error hidden"></div>
             </section>
 
             <!-- Comparison Section -->
@@ -111,8 +150,63 @@
                 </div>
             </section>
 
+            <!-- Supabase Vector Database Section -->
+            <section class="card database-section">
+                <h2>💾 Vector Database (Supabase)</h2>
+                <p class="description">Store embeddings in Supabase and search for similar content</p>
+                
+                <div class="database-actions">
+                    <div class="action-group">
+                        <h3>📥 Store Embeddings</h3>
+                        <p class="action-description">Generate and store embeddings in your Supabase database</p>
+                        <div class="button-group">
+                            <button id="storeContent" class="btn btn-primary">Store Content.js (10 podcasts)</button>
+                            <button id="storeCustom" class="btn btn-secondary">Store Custom Batch</button>
+                        </div>
+                    </div>
+
+                    <div class="action-group">
+                        <h3>🔎 Semantic Search</h3>
+                        <p class="action-description">Search for similar documents in your database using native pgvector similarity</p>
+                        <div class="input-group">
+                            <textarea 
+                                id="searchQuery" 
+                                placeholder="Enter your search query... (e.g., 'space exploration')"
+                                rows="2"
+                            ></textarea>
+                            <div class="search-controls">
+                                <label for="searchLimit">Results: <input type="number" id="searchLimit" value="5" min="1" max="20"></label>
+                                <label for="searchThreshold">Min Similarity: <input type="number" id="searchThreshold" value="0.5" min="0" max="1" step="0.05"></label>
+                                <button id="searchSimilar" class="btn btn-primary">Search Similar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-group">
+                        <h3>📋 Database Management</h3>
+                        <p class="action-description">View and manage your stored documents</p>
+                        <div class="button-group">
+                            <button id="viewDocuments" class="btn btn-secondary">View All Documents</button>
+                            <button id="deleteAll" class="btn btn-danger">Delete All Documents</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="databaseResult" class="result hidden">
+                    <div class="result-header">
+                        <h3 id="databaseResultTitle">✅ Operation Complete</h3>
+                        <span class="badge" id="databaseCount"></span>
+                    </div>
+                    <div class="result-content" id="databaseResultContent">
+                        <!-- Dynamic content will be inserted here -->
+                    </div>
+                </div>
+
+                <div id="databaseError" class="error hidden"></div>
+            </section>
+
             <footer>
-                <p>Powered by OpenAI's text-embedding-ada-002 model</p>
+                <p>🔒 Secure vector database powered by Supabase & OpenAI</p>
             </footer>
         </div>
 

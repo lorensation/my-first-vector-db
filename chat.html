@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Chatbot - Podcast Expert</title>
+  <link rel="stylesheet" href="chat.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="chat-header">
+      <div class="header-content">
+        <div class="logo">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <h1>Podcast Expert AI</h1>
+        </div>
+        <nav class="nav-links">
+          <a href="index.html" class="nav-link">← Back to Embeddings</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Chat Container -->
+    <main class="chat-container">
+      <div class="chat-messages" id="chatMessages">
+        <!-- Initial welcome message will be added by JavaScript -->
+      </div>
+
+      <!-- Input Area -->
+      <div class="chat-input-container">
+        <div class="input-wrapper">
+          <textarea 
+            id="userInput" 
+            placeholder="Ask me about podcasts... (e.g., 'Tell me about space exploration')"
+            rows="1"
+            maxlength="500"
+          ></textarea>
+          <button id="sendButton" class="send-button" title="Send message">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+        <div class="input-info">
+          <span class="char-count"><span id="charCount">0</span>/500</span>
+          <span class="powered-by">Powered by OpenAI GPT-3.5 Turbo + Vector Search</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- Error Toast -->
+    <div id="errorToast" class="error-toast hidden">
+      <span id="errorMessage"></span>
+      <button onclick="hideErrorToast()" class="close-toast">✕</button>
+    </div>
+  </div>
+
+  <script src="chat.js"></script>
+</body>
+</html>
