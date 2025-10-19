@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>OpenAI Embeddings Showcase</title>
+        <link rel="stylesheet" href="index.css">
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>🔢 OpenAI Embeddings Showcase</h1>
+                <p class="subtitle">Explore text embeddings and semantic similarity using OpenAI's text-embedding-ada-002 model</p>
+            </header>
+
+            <!-- Single Embedding Section -->
+            <section class="card">
+                <h2>📝 Create an Embedding</h2>
+                <p class="description">Enter any text to generate a vector embedding (1536 dimensions)</p>
+                
+                <div class="input-group">
+                    <textarea 
+                        id="singleText" 
+                        placeholder="Type or paste your text here... (e.g., 'artificial intelligence')"
+                        rows="3"
+                    ></textarea>
+                    <button id="createEmbedding" class="btn btn-primary">Generate Embedding</button>
+                </div>
+
+                <div id="singleResult" class="result hidden">
+                    <div class="result-header">
+                        <h3>✅ Embedding Created</h3>
+                        <span class="badge" id="dimensionBadge"></span>
+                    </div>
+                    <div class="result-content">
+                        <p><strong>Input Text:</strong> <span id="resultText"></span></p>
+                        <details>
+                            <summary>View First 10 Dimensions</summary>
+                            <pre id="embeddingPreview"></pre>
+                        </details>
+                        <details>
+                            <summary>View Complete Embedding Vector (1536 dimensions)</summary>
+                            <pre id="embeddingFull"></pre>
+                        </details>
+                    </div>
+                </div>
+
+                <div id="singleError" class="error hidden"></div>
+            </section>
+
+            <!-- Comparison Section -->
+            <section class="card">
+                <h2>🔍 Compare Text Similarity</h2>
+                <p class="description">Compare two texts to see how semantically similar they are</p>
+                
+                <div class="comparison-grid">
+                    <div class="input-group">
+                        <label for="text1">First Text</label>
+                        <textarea 
+                            id="text1" 
+                            placeholder="e.g., 'dog'"
+                            rows="3"
+                        ></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label for="text2">Second Text</label>
+                        <textarea 
+                            id="text2" 
+                            placeholder="e.g., 'puppy'"
+                            rows="3"
+                        ></textarea>
+                    </div>
+                </div>
+                
+                <button id="compareTexts" class="btn btn-primary">Compare Similarity</button>
+
+                <div id="compareResult" class="result hidden">
+                    <div class="result-header">
+                        <h3>📊 Similarity Analysis</h3>
+                    </div>
+                    <div class="result-content">
+                        <div class="similarity-score">
+                            <div class="score-circle">
+                                <span id="similarityScore"></span>
+                            </div>
+                            <p id="similarityInterpretation" class="interpretation"></p>
+                        </div>
+                        <div class="comparison-texts">
+                            <p><strong>Text 1:</strong> <span id="compText1"></span></p>
+                            <p><strong>Text 2:</strong> <span id="compText2"></span></p>
+                        </div>
+                        <div class="similarity-bar">
+                            <div id="similarityProgress" class="progress"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="compareError" class="error hidden"></div>
+            </section>
+
+            <!-- Examples Section -->
+            <section class="examples">
+                <h3>💡 Try These Examples</h3>
+                <div class="example-grid">
+                    <button class="example-btn" data-text1="cat" data-text2="dog">cat vs dog</button>
+                    <button class="example-btn" data-text1="king" data-text2="queen">king vs queen</button>
+                    <button class="example-btn" data-text1="happy" data-text2="joyful">happy vs joyful</button>
+                    <button class="example-btn" data-text1="car" data-text2="airplane">car vs airplane</button>
+                    <button class="example-btn" data-text1="pizza" data-text2="mathematics">pizza vs math</button>
+                    <button class="example-btn" data-text1="summer" data-text2="winter">summer vs winter</button>
+                </div>
+            </section>
+
+            <footer>
+                <p>Powered by OpenAI's text-embedding-ada-002 model</p>
+            </footer>
+        </div>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Processing...</p>
+        </div>
+
+        <script src="index.js"></script>
+    </body>
+</html>
