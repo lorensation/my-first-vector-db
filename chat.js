@@ -4,7 +4,14 @@ const API_BASE_URL = 'http://localhost:8080/api';
 // Chat history with system prompt
 const chatMessages = [{
   role: 'system',
-  content: `You are an enthusiastic podcast expert who loves recommending podcasts to people. You will be given two pieces of information - some context about podcasts episodes and a question. Your main job is to formulate a short answer to the question using the provided context. If you are unsure and cannot find the answer in the context, say, "Sorry, I don't know the answer." Please do not make up the answer.`
+  content: `You are an enthusiastic AI assistant with expertise in both podcasts and movies. You have access to a knowledge base containing information about podcast episodes and movie descriptions. When answering questions, you will be provided with relevant context from both sources. Your job is to:
+    1. Formulate clear, concise answers using the provided context
+    2. Mention whether the information comes from podcasts, movies, or both
+    3. If you find relevant information from both sources, feel free to mention both
+    4. If you are unsure and cannot find the answer in the context, say "Sorry, I don't know the answer."
+    5. Do not make up information - only use what's provided in the context
+
+    Be friendly, enthusiastic, and helpful!`
 }];
 
 // DOM Elements
@@ -56,21 +63,27 @@ function displayWelcomeMessage() {
   const welcomeHTML = `
     <div class="message bot welcome-message">
       <div class="message-content">
-        <div class="welcome-icon">🎙️</div>
-        <h2 class="welcome-title">Welcome to Podcast Expert AI!</h2>
+        <div class="welcome-icon">🤖</div>
+        <h2 class="welcome-title">Welcome to AI Knowledge Assistant!</h2>
         <p class="welcome-description">
-          I'm your AI-powered podcast assistant. I have knowledge about various podcast episodes 
-          stored in a vector database. Ask me anything about podcasts, and I'll search through 
-          my knowledge base to give you the best recommendations and insights!
+          I'm your AI-powered assistant with access to a comprehensive knowledge base about 
+          <strong>podcasts</strong> 🎙️ and <strong>movies</strong> 🎬! I use vector search 
+          to find the most relevant information from both sources to answer your questions.
         </p>
         <div class="welcome-examples">
           <h4>Try asking:</h4>
           <ul>
-            <li onclick="fillExample('Tell me about space exploration podcasts')">💫 Tell me about space exploration podcasts</li>
-            <li onclick="fillExample('What podcasts discuss ocean mysteries?')">🌊 What podcasts discuss ocean mysteries?</li>
-            <li onclick="fillExample('Recommend a podcast about AI and technology')">🤖 Recommend a podcast about AI and technology</li>
-            <li onclick="fillExample('What can I listen to about music and culture?')">🎵 What can I listen to about music and culture?</li>
+            <li onclick="fillExample('Tell me about space exploration')">� Tell me about space exploration</li>
+            <li onclick="fillExample('What content do you have about mysteries?')">🔍 What content do you have about mysteries?</li>
+            <li onclick="fillExample('Recommend something about AI and technology')">🤖 Recommend something about AI and technology</li>
+            <li onclick="fillExample('What can I watch or listen to about adventure?')">🗺️ What can I watch or listen to about adventure?</li>
+            <li onclick="fillExample('Tell me about comedy content')">😄 Tell me about comedy content</li>
+            <li onclick="fillExample('What do you know about World War II?')">⚔️ What do you know about World War II?</li>
           </ul>
+        </div>
+        <div class="knowledge-sources">
+          <span class="source-badge podcast">🎙️ Podcasts</span>
+          <span class="source-badge movie">🎬 Movies</span>
         </div>
       </div>
     </div>
@@ -119,38 +132,59 @@ async function handleSendMessage() {
   const loadingId = addLoadingMessage();
 
   try {
-    // Step 1: Search for similar content
-    const searchResponse = await fetch(`${API_BASE_URL}/search-similar`, {
+    // Step 1: Search for similar content in both tables
+    const searchResponse = await fetch(`${API_BASE_URL}/chat/search-all`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
         query: message, 
-        limit: 1,
-        threshold: 0.3 // Lower threshold to get results
+        limit: 3,
+        threshold: 0.3
       })
     });
 
     const searchData = await searchResponse.json();
 
     if (!searchResponse.ok) {
-      throw new Error(searchData.error || 'Failed to search database');
+      throw new Error(searchData.error || 'Failed to search knowledge base');
     }
 
-    // Get the top matching context
-    let context = 'No relevant podcast information found.';
-    let similarity = 0;
+    // Build context from all sources
+    let contextParts = [];
+    let sources = [];
     
-    if (searchData.results && searchData.results.length > 0) {
-      context = searchData.results[0].content;
-      similarity = searchData.results[0].similarity;
+    if (searchData.podcasts && searchData.podcasts.length > 0) {
+      const podcastContext = searchData.podcasts
+        .map((p, i) => `Podcast ${i + 1}: ${p.content}`)
+        .join('\n\n');
+      contextParts.push(`=== PODCAST CONTENT ===\n${podcastContext}`);
+      sources.push(`${searchData.podcastCount} podcast${searchData.podcastCount !== 1 ? 's' : ''}`);
+    }
+    
+    if (searchData.movies && searchData.movies.length > 0) {
+      const movieContext = searchData.movies
+        .map((m, i) => `Movie ${i + 1}: ${m.content}`)
+        .join('\n\n');
+      contextParts.push(`=== MOVIE CONTENT ===\n${movieContext}`);
+      sources.push(`${searchData.movieCount} movie${searchData.movieCount !== 1 ? 's' : ''}`);
+    }
+
+    let context = 'No relevant information found in the knowledge base.';
+    let maxSimilarity = 0;
+    
+    if (contextParts.length > 0) {
+      context = contextParts.join('\n\n');
+      maxSimilarity = Math.max(
+        ...searchData.results.map(r => r.similarity)
+      );
     }
 
     // Step 2: Add context and user question to chat history
     chatMessages.push({
       role: 'user',
-      content: `Context: ${context}\n\nQuestion: ${message}`
+      content: `Context from knowledge base:\n\n${context}\n\nUser Question: ${message}`
     });
 
     // Step 3: Get chat completion from OpenAI
@@ -179,14 +213,14 @@ async function handleSendMessage() {
     // Remove loading indicator
     removeLoadingMessage(loadingId);
 
-    // Display bot response
-    addBotMessage(chatData.message, context, similarity);
+    // Display bot response with source information
+    addBotMessage(chatData.message, sources.join(' and '), maxSimilarity, searchData);
 
   } catch (error) {
     console.error('Error:', error);
     removeLoadingMessage(loadingId);
     showError(error.message);
-    addBotMessage('Sorry, I encountered an error processing your request. Please try again.', null, 0);
+    addBotMessage('Sorry, I encountered an error processing your request. Please try again.', null, 0, null);
   } finally {
     sendButton.disabled = false;
     userInput.focus();
@@ -218,14 +252,27 @@ function addUserMessage(message) {
 /**
  * Add bot message to chat
  */
-function addBotMessage(message, context, similarity) {
+function addBotMessage(message, sources, similarity, searchData) {
   const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   
   let metaHTML = `<span>${timestamp}</span>`;
   
-  if (context && similarity > 0) {
+  if (sources && similarity > 0) {
     const similarityPercent = (similarity * 100).toFixed(0);
-    metaHTML += `<span class="context-badge">📚 Context match: ${similarityPercent}%</span>`;
+    metaHTML += `<span class="context-badge">📚 Sources: ${sources} (${similarityPercent}% match)</span>`;
+  }
+  
+  // Add source breakdown if available
+  let sourceBreakdown = '';
+  if (searchData && (searchData.podcastCount > 0 || searchData.movieCount > 0)) {
+    const badges = [];
+    if (searchData.podcastCount > 0) {
+      badges.push(`<span class="source-badge podcast">🎙️ ${searchData.podcastCount} Podcast${searchData.podcastCount !== 1 ? 's' : ''}</span>`);
+    }
+    if (searchData.movieCount > 0) {
+      badges.push(`<span class="source-badge movie">🎬 ${searchData.movieCount} Movie${searchData.movieCount !== 1 ? 's' : ''}</span>`);
+    }
+    sourceBreakdown = `<div class="source-breakdown">${badges.join('')}</div>`;
   }
   
   const messageHTML = `
@@ -237,6 +284,7 @@ function addBotMessage(message, context, similarity) {
       </div>
       <div class="message-content">
         <p class="message-text">${escapeHtml(message)}</p>
+        ${sourceBreakdown}
         <div class="message-meta">
           ${metaHTML}
         </div>

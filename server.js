@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { openai, supabase } from './config.js';
+import fs from 'fs';
+import path from 'path';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
 // Load environment variables
 dotenv.config();
@@ -417,6 +420,244 @@ app.delete('/api/documents', async (req, res) => {
 });
 
 /**
+ * POST /api/movies/process
+ * Split movies.txt content using text splitter and store with embeddings
+ * Body: { 
+ *   chunkSize: number (optional, default 200),
+ *   chunkOverlap: number (optional, default 50)
+ * }
+ */
+app.post('/api/movies/process', async (req, res) => {
+  try {
+    const { chunkSize = 200, chunkOverlap = 50 } = req.body;
+
+    console.log(`🎬 Processing movies.txt with chunkSize=${chunkSize}, chunkOverlap=${chunkOverlap}`);
+
+    // Read movies.txt file
+    const filePath = path.join(process.cwd(), 'movies.txt');
+    const content = fs.readFileSync(filePath, 'utf-8');
+
+    // Use LangChain's CharacterTextSplitter
+    const textSplitter = new RecursiveCharacterTextSplitter({
+      chunkSize: chunkSize,
+      chunkOverlap: chunkOverlap,
+    });
+    
+    const chunks = await textSplitter.splitText(content);
+
+    console.log(`📝 Split text into ${chunks.length} chunks`);
+
+    // Create embeddings for all chunks
+    const embeddingPromises = chunks.map(chunk => 
+      openai.embeddings.create({
+        model: "text-embedding-ada-002",
+        input: chunk,
+      })
+    );
+
+    const embeddingResponses = await Promise.all(embeddingPromises);
+
+    // Prepare data for Supabase insertion
+    const moviesToInsert = chunks.map((chunk, index) => ({
+      content: chunk,
+      embedding: embeddingResponses[index].data[0].embedding
+    }));
+
+    console.log(`💾 Inserting ${moviesToInsert.length} movie chunks into Supabase...`);
+
+    // Insert into Supabase movies table
+    const { data: insertedData, error: insertError } = await supabase
+      .from('movies')
+      .insert(moviesToInsert)
+      .select();
+
+    if (insertError) {
+      console.error('Supabase insertion error:', insertError);
+      throw new Error(`Database insertion failed: ${insertError.message}`);
+    }
+
+    console.log(`✅ Successfully stored ${insertedData.length} movie chunks in Supabase`);
+
+    res.json({
+      success: true,
+      count: insertedData.length,
+      chunkSize,
+      chunkOverlap,
+      chunks: insertedData.map(doc => ({
+        id: doc.id,
+        content: doc.content,
+        hasEmbedding: !!doc.embedding
+      })),
+      message: `Successfully processed and stored ${insertedData.length} movie chunks`
+    });
+
+  } catch (error) {
+    console.error('Error processing movies:', error);
+    res.status(500).json({ 
+      error: 'Failed to process movies',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/movies
+ * Retrieve all movie chunks from Supabase
+ * Query params: limit (default 50), offset (default 0)
+ */
+app.get('/api/movies', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const { data, error, count } = await supabase
+      .from('movies')
+      .select('id, content', { count: 'exact' })
+      .range(offset, offset + limit - 1)
+      .order('id', { ascending: true });
+
+    if (error) {
+      throw new Error(`Database query failed: ${error.message}`);
+    }
+
+    res.json({
+      success: true,
+      count: data.length,
+      total: count,
+      movies: data,
+      pagination: {
+        limit,
+        offset,
+        hasMore: count > (offset + limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error retrieving movies:', error);
+    res.status(500).json({ 
+      error: 'Failed to retrieve movies',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * POST /api/movies/search
+ * Search for similar movie chunks using vector similarity
+ * Body: { 
+ *   query: string, 
+ *   limit: number (optional, default 5),
+ *   threshold: number (optional, default 0.5, range 0-1)
+ * }
+ */
+app.post('/api/movies/search', async (req, res) => {
+  try {
+    const { query, limit = 5, threshold = 0.5 } = req.body;
+
+    if (!query || typeof query !== 'string' || query.trim().length === 0) {
+      return res.status(400).json({ 
+        error: 'Invalid input. Please provide a non-empty query string.' 
+      });
+    }
+
+    // Validate threshold
+    const matchThreshold = Math.max(0, Math.min(1, threshold));
+    const matchCount = Math.max(1, Math.min(50, limit));
+
+    console.log(`🔍 Searching for movies similar to: "${query}" (threshold: ${matchThreshold}, limit: ${matchCount})`);
+
+    // Create embedding for the query
+    const embeddingResponse = await openai.embeddings.create({
+      model: "text-embedding-ada-002",
+      input: query.trim(),
+    });
+
+    const queryEmbedding = embeddingResponse.data[0].embedding;
+
+    // Use Supabase's RPC function for native pgvector similarity search
+    const { data: results, error } = await supabase
+      .rpc('match_movies', {
+        query_embedding: queryEmbedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount
+      });
+
+    if (error) {
+      // If the function doesn't exist, provide helpful error message
+      if (error.message.includes('function') && error.message.includes('does not exist')) {
+        throw new Error(
+          'Database function "match_movies" not found. ' +
+          'Please run the SQL from "match_movies.sql" in your Supabase SQL Editor.'
+        );
+      }
+      throw new Error(`Database query failed: ${error.message}`);
+    }
+
+    console.log(`✅ Found ${results.length} similar movie chunks`);
+
+    res.json({
+      success: true,
+      query: query.trim(),
+      count: results.length,
+      threshold: matchThreshold,
+      results: results.map(r => ({
+        id: r.id,
+        content: r.content,
+        similarity: r.similarity,
+        similarityPercentage: (r.similarity * 100).toFixed(2) + '%',
+        interpretation: interpretSimilarity(r.similarity)
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error searching similar movies:', error);
+    res.status(500).json({ 
+      error: 'Failed to search similar movies',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * DELETE /api/movies
+ * Delete all movie chunks from Supabase (use with caution!)
+ */
+app.delete('/api/movies', async (req, res) => {
+  try {
+    const { confirm } = req.query;
+
+    if (confirm !== 'true') {
+      return res.status(400).json({ 
+        error: 'Confirmation required. Add ?confirm=true to delete all movies.' 
+      });
+    }
+
+    const { error } = await supabase
+      .from('movies')
+      .delete()
+      .neq('id', 0); // Delete all records
+
+    if (error) {
+      throw new Error(`Database deletion failed: ${error.message}`);
+    }
+
+    console.log('🗑️ All movie chunks deleted from Supabase');
+
+    res.json({
+      success: true,
+      message: 'All movie chunks deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting movies:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete movies',
+      message: error.message 
+    });
+  }
+});
+
+/**
  * POST /api/chat
  * Chat completions endpoint using GPT-3.5-turbo
  * Body: { messages: array of message objects }
@@ -467,7 +708,99 @@ app.post('/api/chat', async (req, res) => {
 });
 
 /**
+ * POST /api/chat/search-all
+ * Search both movies and podcasts tables for relevant context
+ * Body: { 
+ *   query: string,
+ *   limit: number (optional, default 3 per table),
+ *   threshold: number (optional, default 0.3)
+ * }
+ */
+app.post('/api/chat/search-all', async (req, res) => {
+  try {
+    const { query, limit = 3, threshold = 0.3 } = req.body;
+
+    if (!query || typeof query !== 'string' || query.trim().length === 0) {
+      return res.status(400).json({ 
+        error: 'Invalid input. Please provide a non-empty query string.' 
+      });
+    }
+
+    const matchThreshold = Math.max(0, Math.min(1, threshold));
+    const matchCount = Math.max(1, Math.min(10, limit));
+
+    console.log(`🔍 Searching all tables for: "${query}" (threshold: ${matchThreshold}, limit: ${matchCount})`);
+
+    // Create embedding for the query
+    const embeddingResponse = await openai.embeddings.create({
+      model: "text-embedding-ada-002",
+      input: query.trim(),
+    });
+
+    const queryEmbedding = embeddingResponse.data[0].embedding;
+
+    // Search both tables in parallel
+    const [podcastResults, movieResults] = await Promise.all([
+      supabase.rpc('match_documents', {
+        query_embedding: queryEmbedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount
+      }),
+      supabase.rpc('match_movies', {
+        query_embedding: queryEmbedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount
+      })
+    ]);
+
+    // Process podcast results
+    const podcasts = (podcastResults.data || []).map(r => ({
+      id: r.id,
+      content: r.content,
+      similarity: r.similarity,
+      source: 'podcast',
+      similarityPercentage: (r.similarity * 100).toFixed(2) + '%'
+    }));
+
+    // Process movie results
+    const movies = (movieResults.data || []).map(r => ({
+      id: r.id,
+      content: r.content,
+      similarity: r.similarity,
+      source: 'movie',
+      similarityPercentage: (r.similarity * 100).toFixed(2) + '%'
+    }));
+
+    // Combine and sort by similarity
+    const allResults = [...podcasts, ...movies]
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, matchCount * 2); // Get top results from both
+
+    console.log(`✅ Found ${podcasts.length} podcasts and ${movies.length} movies`);
+
+    res.json({
+      success: true,
+      query: query.trim(),
+      totalCount: allResults.length,
+      podcastCount: podcasts.length,
+      movieCount: movies.length,
+      results: allResults,
+      podcasts: podcasts,
+      movies: movies
+    });
+
+  } catch (error) {
+    console.error('Error searching all tables:', error);
+    res.status(500).json({ 
+      error: 'Failed to search knowledge base',
+      message: error.message 
+    });
+  }
+});
+
+/**
  * Calculate cosine similarity between two vectors
+ * Used for client-side comparison without database
  */
 function cosineSimilarity(vecA, vecB) {
   const dotProduct = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
@@ -504,10 +837,17 @@ app.listen(PORT, () => {
   console.log(`  📋 Get Documents: GET /api/documents`);
   console.log(`  🔎 Search Similar: POST /api/search-similar`);
   console.log(`  🗑️  Delete All: DELETE /api/documents?confirm=true`);
+  console.log(`\n🎬 Movies (Text Splitter Demo):`);
+  console.log(`  🎬 Process Movies: POST /api/movies/process`);
+  console.log(`  📋 Get Movie Chunks: GET /api/movies`);
+  console.log(`  🔎 Search Movies: POST /api/movies/search`);
+  console.log(`  🗑️  Delete All Movies: DELETE /api/movies?confirm=true`);
   console.log(`\n🤖 AI Chat:`);
   console.log(`  💬 Chat Completions: POST /api/chat`);
+  console.log(`  🔎 Search All Knowledge: POST /api/chat/search-all`);
   console.log(`\n✅ Health Check: GET /api/health`);
   console.log(`\n📄 Pages:`);
   console.log(`  🏠 Embeddings Demo: http://localhost:${PORT}/index.html`);
   console.log(`  💬 Chatbot: http://localhost:${PORT}/chat.html`);
+  console.log(`  🎬 Movies Text Splitter: http://localhost:${PORT}/movies.html`);
 });

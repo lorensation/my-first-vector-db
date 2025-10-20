@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Splitters & Vector Search Demo</title>
+    <link rel="stylesheet" href="movies.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div>
+                    <h1>🎬 Text Splitters & Vector Search</h1>
+                    <p class="subtitle">Visualize how LangChain text splitters work with embeddings and vector databases</p>
+                </div>
+                <div class="header-buttons">
+                    <a href="index.html" class="btn btn-secondary">🔢 Embeddings</a>
+                    <a href="chat.html" class="btn btn-secondary">💬 Chatbot</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Process Section -->
+        <section class="card">
+            <h2>⚙️ Step 1: Process Movies Text</h2>
+            <p class="description">Split the movies.txt file into chunks and create embeddings for each chunk</p>
+            
+            <div class="process-controls">
+                <div class="input-row">
+                    <div class="input-field">
+                        <label for="chunkSize">Chunk Size (characters)</label>
+                        <input type="number" id="chunkSize" value="200" min="50" max="1000" step="50">
+                    </div>
+                    <div class="input-field">
+                        <label for="chunkOverlap">Chunk Overlap (characters)</label>
+                        <input type="number" id="chunkOverlap" value="50" min="0" max="200" step="10">
+                    </div>
+                </div>
+                <button id="processBtn" class="btn btn-primary">🚀 Process & Store Chunks</button>
+                <button id="loadChunksBtn" class="btn btn-secondary">📋 Load Existing Chunks</button>
+                <button id="clearBtn" class="btn btn-danger">🗑️ Clear All Chunks</button>
+            </div>
+
+            <div id="processResult" class="result hidden">
+                <div class="result-header">
+                    <h3>✅ Processing Complete</h3>
+                    <span class="badge" id="chunkCount"></span>
+                </div>
+                <p id="processMessage"></p>
+            </div>
+
+            <div id="processError" class="error hidden"></div>
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Processing text chunks and creating embeddings...</p>
+            </div>
+        </section>
+
+        <!-- Visualization Section -->
+        <section class="card">
+            <h2>📊 Step 2: Visualize Text Chunks</h2>
+            <p class="description">See how the text is split into overlapping chunks</p>
+            
+            <div id="chunksContainer" class="chunks-container">
+                <div class="empty-state">
+                    <p>🎬 No chunks loaded yet. Process the movies.txt file above to see the chunks!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Search Section -->
+        <section class="card">
+            <h2>🔍 Step 3: Search Similar Content</h2>
+            <p class="description">Use semantic search to find similar movie chunks based on your query</p>
+            
+            <div class="search-controls">
+                <div class="input-group">
+                    <textarea 
+                        id="searchQuery" 
+                        placeholder="Enter your search query... (e.g., 'action movies', 'comedy about family', 'science fiction')"
+                        rows="3"
+                    ></textarea>
+                    <div class="search-options">
+                        <div class="input-field">
+                            <label for="resultLimit">Results</label>
+                            <input type="number" id="resultLimit" value="5" min="1" max="20">
+                        </div>
+                        <div class="input-field">
+                            <label for="threshold">Threshold</label>
+                            <input type="number" id="threshold" value="0.5" min="0" max="1" step="0.05">
+                        </div>
+                        <button id="searchBtn" class="btn btn-primary">🔎 Search</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="searchResults" class="search-results hidden">
+                <div class="result-header">
+                    <h3>🎯 Search Results</h3>
+                    <span class="badge" id="resultCount"></span>
+                </div>
+                <div id="resultsContainer"></div>
+            </div>
+
+            <div id="searchError" class="error hidden"></div>
+            <div id="searchLoading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Searching for similar content...</p>
+            </div>
+        </section>
+
+        <!-- Info Section -->
+        <section class="card info-card">
+            <h2>ℹ️ How It Works</h2>
+            <div class="info-content">
+                <div class="info-step">
+                    <h3>1️⃣ Text Splitting</h3>
+                    <p>The text splitter breaks down the movies.txt file into smaller chunks of a specified size with optional overlap. This ensures that context is preserved across chunk boundaries.</p>
+                </div>
+                <div class="info-step">
+                    <h3>2️⃣ Embedding Generation</h3>
+                    <p>Each text chunk is converted into a 1536-dimensional vector using OpenAI's text-embedding-ada-002 model. These vectors capture the semantic meaning of the text.</p>
+                </div>
+                <div class="info-step">
+                    <h3>3️⃣ Vector Database Storage</h3>
+                    <p>The text chunks and their embeddings are stored in a Supabase database with pgvector extension, enabling fast similarity searches.</p>
+                </div>
+                <div class="info-step">
+                    <h3>4️⃣ Semantic Search</h3>
+                    <p>When you search, your query is also converted to an embedding and compared against all stored chunks using cosine similarity to find the most relevant matches.</p>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>Built with OpenAI Embeddings, Supabase (pgvector), and Express.js</p>
+        </footer>
+    </div>
+
+    <script src="movies.js"></script>
+</body>
+</html>
